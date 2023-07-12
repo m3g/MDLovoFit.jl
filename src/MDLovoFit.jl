@@ -4,9 +4,7 @@ using TestItems
 using DelimitedFiles
 using PDBTools
 import Chemfiles
-
-# Assume, for now, that `mdlovofit` is installed as a standalone package
-mdlovofit_executable = "mdlovofit"
+import MDLovoFit_jll
 
 # Structure that will contain the output of MDLovoFit
 struct MDLovoFitResult
@@ -115,18 +113,15 @@ function mdlovofit(
     # Name of RMSF file
     rmsf_file = tempname()
     # Name of RMSD file
+    rmsd_file = tempname()
     # Run MDLovoFit
-    command = "$mdlovofit_executable -f $fraction -iref $iref -rmsf $rmsf_file -t $output_pdb $tmp_trajectory_file" 
-    rmsd_output = try 
-        read(pipeline(`$mdlovofit_executable -f $fraction -iref $iref -rmsf $rmsf_file -t $output_pdb $tmp_trajectory_file`, stdout=IOBuffer()))
+    try
+        MDLovoFit_jll.mdlovofit() do exe
+            pipeline(`$exe -f $fraction -iref $iref -rmsf $rmsf_file -t $output_pdb $tmp_trajectory_file`; stdout=rmsd_file)
+        end
     catch 
         "ERROR in MDLovoFit execution"
         "Command executed: $command"
-    end
-    @show rmsd_output
-    rmsd_file = tempname()
-    open(rmsd_file, "w") do f
-        write(f, rmsd_output)
     end
     # Read RMSD file
     rmsd_data = readdlm(rmsd_file; comment_char='#')

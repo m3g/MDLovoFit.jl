@@ -6,12 +6,14 @@ version = "1.0.0-DEV"
 [deps]
 Chemfiles = "46823bd8-5fb3-5f92-9aa0-96921f3dd015"
 DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"
+MDLovoFit_jll = "d8780812-71d7-51d3-b38b-dae269fdfcb3"
 PDBTools = "e29189f1-7114-4dbd-93d0-c5673a921a58"
 TestItems = "1c621080-faea-4a02-84b6-bbd5e436b8fe"
 
 [compat]
-DelimitedFiles = "1.9"
+MDLovoFit_jll = "20.0.4"
 Chemfiles = "0.10"
+DelimitedFiles = "1.9"
 PDBTools = "0.13.14"
 TestItems = "0.1.1"
 julia = "1"
