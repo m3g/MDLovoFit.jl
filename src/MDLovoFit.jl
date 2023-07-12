@@ -161,13 +161,13 @@ function mdlovofit(
         "Command executed: $command"
     end
     # Read RMSD file
-    rmsd_data = readdlm(rmsd_file; comment_char='#')
+    rmsd_data = readdlm(rmsd_file; comments=true, comment_char='#')
     frame_index = collect(first:stride:last)
     rmsd_low = rmsd_data[:,2]
     rmsd_high = rmsd_data[:,3]
     rmsd_all = rmsd_data[:,4]
     # Read RMSF file
-    rmsf = readdlm(rmsf_file; comment_char='#')
+    rmsf = readdlm(rmsf_file; comments=true, comment_char='#')[:,2]
     # Retun the data structure with the results
     return MDLovoFitResult(frame_index, rmsd_low, rmsd_high, rmsd_all, rmsf, output_pdb)
 end
