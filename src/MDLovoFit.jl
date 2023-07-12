@@ -6,13 +6,35 @@ using PDBTools
 import Chemfiles
 import MDLovoFit_jll
 
+# Functions of the interface
+export MDLovoFitResult
+export mdlovofit
+
 # Structure that will contain the output of MDLovoFit
+"""
+    MDLovoFitResult
+
+Structure that will contain the output of MDLovoFit.
+
+`iframe` is the frame index.
+
+`rmsd_low` is the RMSD of the fraction of the structure with the lowest RMSD.
+
+`rmsd_high` is the RMSD of the fraction of the structure with the highest RMSD.
+
+`rmsd_all` is the RMSD of the whole structure.
+
+`rmsf` is the RMSF as a function of the residue or atom index. 
+
+`aligned_pdb` is the name of the PDB file with the aligned structure.
+
+"""
 struct MDLovoFitResult
     iframe::Vector{Int}
     rmsd_low::Vector{Float64}
     rmsd_high::Vector{Float64}
     rmsd_all::Vector{Float64}
-    rmsf::AbstractVector{Float64}
+    rmsf::Vector{Float64}
     aligned_pdb::String
 end
 
@@ -55,14 +77,14 @@ function write_tmp_pdb_trajectory(
     tmp_file = tempname()
     tmp_trajectory = open(tmp_file, "w")
     for (iframe, frame) in enumerate(trajectory)
-        if iframe % stride != 0
-            continue
-        end
         if iframe < first
             continue
         end
         if iframe > last
             break
+        end
+        if (iframe-first) % stride != 0
+            continue
         end
         write_frame!(tmp_trajectory, atoms, frame)
     end
@@ -71,7 +93,17 @@ function write_tmp_pdb_trajectory(
 end
 
 """
-    mdlovofit(atoms, trajectory_file, fraction; output_pdb=nothing, atoms_to_consider=atoms, first=1, last=nothing, stride=1, iref=1)
+    mdlovofit(
+        atoms::AbstractVector{<:PDBTools.Atom}, # atoms of the system (usually a "protein and name CA" selection)
+        trajectory_file::String, # name of the trajectory file 
+        fraction; # fraction of atoms to be aligned
+        output_pdb=nothing, # name of the output file. If nothing, no output file is written
+        atoms_to_consider=atoms, # may be a different set of atoms
+        first=1, 
+        last=nothing, # nothing means the last frame of the trajectory
+        iref=1, # reference frame
+        nframes=100, # number of frames to be aligned
+    )
 
 Run MDLovoFit on a trajectory.
 
@@ -82,22 +114,21 @@ function mdlovofit(
     fraction::AbstractFloat; 
     output_pdb::Union{String,Nothing} = nothing,
     atoms_to_consider::AbstractVector{<:PDBTools.Atom} = atoms,
-    first=1, last=nothing, stride=1, iref=1,
+    first=1, last=nothing, iref=1, nframes=100,
 )
-    trajectory = Chemfiles.Trajectory(trajectory_file)
-    if isnothing(last)
-        last = length(trajectory)
-    else
-        if last > length(trajectory)
-            throw(ArgumentError("last > length(trajectory)"))
+    # Open trajectory and save it in temporary PDB file, for the selected atoms
+    tmp_trajectory_file, stride, last = Chemfiles.Trajectory(trajectory_file) do trajectory 
+        if isnothing(last)
+            last = length(trajectory)
+        else
+            if last > length(trajectory)
+                throw(ArgumentError("last > length(trajectory)"))
+            end
         end
-    end
-    # Write temporary PDB file with the trajectory
-    tmp_trajectory_file = write_tmp_pdb_trajectory(atoms, trajectory; first=first, last=last, stride=stride)
-    close(trajectory)
-    # Output PDB file
-    if isnothing(output_pdb) 
-        output_pdb = tempname()
+        # Write temporary PDB file with the trajectory
+        stride = max(1,div(last-first+1,nframes))
+        tmp_trajectory_file = write_tmp_pdb_trajectory(atoms, trajectory; first=first, last=last, stride=stride)
+        return tmp_trajectory_file, stride, last
     end
     # Write atoms to consider file, by default all atoms are considered
     tmp_atoms_to_consider_file = tempname()
@@ -116,8 +147,14 @@ function mdlovofit(
     rmsd_file = tempname()
     # Run MDLovoFit
     try
-        MDLovoFit_jll.mdlovofit() do exe
-            pipeline(`$exe -f $fraction -iref $iref -rmsf $rmsf_file -t $output_pdb $tmp_trajectory_file`; stdout=rmsd_file)
+        if isnothing(output_pdb)
+            MDLovoFit_jll.mdlovofit() do exe
+                run(pipeline(`$exe -f $fraction -iref $iref -rmsf $rmsf_file $tmp_trajectory_file`; stdout=rmsd_file))
+            end
+        else
+            MDLovoFit_jll.mdlovofit() do exe
+                run(pipeline(`$exe -f $fraction -iref $iref -rmsf $rmsf_file -t $output_pdb $tmp_trajectory_file`; stdout=rmsd_file))
+            end
         end
     catch 
         "ERROR in MDLovoFit execution"
@@ -131,10 +168,24 @@ function mdlovofit(
     rmsd_all = rmsd_data[:,4]
     # Read RMSF file
     rmsf = readdlm(rmsf_file; comment_char='#')
-    # If the output PDB is not desired then delete it
-    rm(output_pdb)
     # Retun the data structure with the results
     return MDLovoFitResult(frame_index, rmsd_low, rmsd_high, rmsd_all, rmsf, output_pdb)
+end
+
+function mdlovofit(
+    selection::String,
+    pdbfile::String, 
+    trajectory_file::String, 
+    fraction::AbstractFloat; 
+    kargs...
+)
+    atoms = readPDB(pdbfile, selection)
+    return mdlovofit(
+        atoms, 
+        trajectory_file, 
+        fraction; 
+        kargs...
+    )
 end
 
 # Testing module
