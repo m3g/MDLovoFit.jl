@@ -1,6 +1,7 @@
 module MDLovoFit
 
 using TestItems
+using Statistics: mean
 using DelimitedFiles
 using PDBTools
 import Chemfiles
@@ -30,6 +31,7 @@ Structure that will contain the output of MDLovoFit.
 
 """
 struct MDLovoFitResult
+    fraction::Float64
     iframe::Vector{Int}
     rmsd_low::Vector{Float64}
     rmsd_high::Vector{Float64}
@@ -38,10 +40,29 @@ struct MDLovoFitResult
     aligned_pdb::String
 end
 
-"""
-    write_frame!(trajectory_pdb_file, atoms, frame)
+import Base: show
+function show(io::IO, result::MDLovoFitResult)
+    print(io, chomp("""
+    ---------------
+    MDLovoFitResult
+    ---------------
 
-Append a frame to a PDB file.
+    Aligned pdb file: $(result.aligned_pdb)
+    Number of frames considered: $(length(result.iframe))
+    Average RMSD of all atoms: $(mean(result.rmsd_all))
+    Average RMSD of the $(round(100*result.fraction,digits=1))% atoms of lowest RMSD: $(mean(result.rmsd_low))
+    Average RMSD of the $(round(100*(1-result.fraction),digits=1))% atoms of highest RMSD: $(mean(result.rmsd_high))
+
+    Frame indices availabe in result.iframe
+    RMSD data availabe in result.rmsd_low, result.rmsd_high and result.rmsd_all
+
+    RMSF data availabe in result.rmsf (Number of atoms: $(length(result.rmsf)))
+    """))
+    return nothing
+end
+
+"""
+    write_frame!(trajectory_pdb_file, atoms, frame
 
 """
 function write_frame!(
@@ -169,7 +190,10 @@ function mdlovofit(
     # Read RMSF file
     rmsf = readdlm(rmsf_file; comments=true, comment_char='#')[:,2]
     # Retun the data structure with the results
-    return MDLovoFitResult(frame_index, rmsd_low, rmsd_high, rmsd_all, rmsf, output_pdb)
+    if !isnothing(output_pdb)
+        output_pdb = "Not saved."
+    end
+    return MDLovoFitResult(fraction, frame_index, rmsd_low, rmsd_high, rmsd_all, rmsf, output_pdb)
 end
 
 function mdlovofit(
