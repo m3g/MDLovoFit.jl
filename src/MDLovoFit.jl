@@ -10,7 +10,29 @@ import MDLovoFit_jll
 # Functions of the interface
 export MDLovoFitResult
 export mdlovofit
+export MapFractions
+export map_fractions
 
+# Structure that contains the result of map_fractions
+struct MapFractionsResult
+    fraction::Vector{Float64}
+    rmsd_low::Vector{Float64}
+    rmsd_high::Vector{Float64}
+    rmsd_all::Vector{Float64}
+end
+
+function show(io::IO, result::MDLovoFitResult)
+    print(io, chomp("""
+    ------------------
+    MapFractionsResult
+    ------------------
+
+    Fraction for which the RMSD-low is greater than 1: $(round(result.fraction[findfirst(>(1.0), result.rmsd_low)],digits=2))
+
+
+    """))
+    return nothing
+end
 # Structure that will contain the output of MDLovoFit
 """
     MDLovoFitResult
@@ -85,32 +107,85 @@ function write_frame!(
 end
 
 """
-    write_tmp_pdb_trajectory(atoms, trajectory; first=1, last=length(trajectory), stride=1)
+    write_tmp_pdb_trajectory(
+        atoms::AbstractVector{<:PDBTools.Atom}, 
+        trajectory_file::String; 
+        first=1, last=nothing, nframes=100,
+    )
 
-Write a temporary PDB file containing a trajectory. Returns the trajectory file name.
+Writes a temporary PDB file containing a trajectory. Returns the trajectory file name, the 
+last frame to be read, and the `stride` parameter.
 
 """
 function write_tmp_pdb_trajectory(
     atoms::AbstractVector{<:PDBTools.Atom}, 
-    trajectory::Chemfiles.Trajectory; 
-    first=1, last=length(trajectory), stride=1
+    trajectory_file::String; 
+    first=1, last=nothing, nframes=100,
 )
-    tmp_file = tempname()
-    tmp_trajectory = open(tmp_file, "w")
-    for (iframe, frame) in enumerate(trajectory)
-        if iframe < first
-            continue
+    Chemfiles.Trajectory(trajectory_file) do trajectory 
+        if isnothing(last)
+            last = length(trajectory)
+        else
+            if last > length(trajectory)
+                throw(ArgumentError("last > length(trajectory)"))
+            end
         end
-        if iframe > last
-            break
+        # Write temporary PDB file with the trajectory
+        stride = max(1,div(last-first+1,nframes))
+        tmp_file = tempname()
+        open(tmp_file, "w") do file_io
+            for (iframe, frame) in enumerate(trajectory)
+                if iframe < first
+                    continue
+                end
+                if iframe > last
+                    break
+                end
+                if (iframe-first) % stride != 0
+                    continue
+                end
+                write_frame!(file_io, atoms, frame)
+            end
         end
-        if (iframe-first) % stride != 0
-            continue
-        end
-        write_frame!(tmp_trajectory, atoms, frame)
+        return tmp_file, last, stride
     end
-    close(tmp_trajectory)
-    return tmp_file
+end
+
+"""
+    map_fractions(atoms::AbstractVector{<:PDBTools.Atom}, trajectory_file::String)
+
+
+"""
+function map_fractions(
+    atoms::AbstractVector{<:PDBTools.Atom}, 
+    trajectory_file::String;
+    first=1,
+    last=nothing,
+    nframes=100,
+)
+    tmp_trajectory_file, last, _ = 
+        write_tmp_pdb_trajectory(atoms, trajectory_file; first=first, last=last, nframes=nframes)
+    mapfrac_file = tempname()
+    MDLovoFit_jll.mdlovofit() do exe
+        run(pipeline(`$exe -mapfrac $tmp_trajectory_file`; stdout=mapfrac_file))
+    end
+    @show mapfrac_file
+    data = readdlm(mapfrac_file, comments=true, comment_char='#')
+    fraction = data[:,1]
+    rmsd_low = data[:,2]
+    rmsd_high = data[:,3]
+    rmsd_all = data[:,4]
+    return MapFractionsResult(fraction, rmsd_low, rmsd_high, rmsd_all)
+end
+
+function map_fractions(
+    selection::String, 
+    pdb_file::String, 
+    trajectory_file::String;
+    kargs...
+)
+    atoms = readPDB(pdb_file, selection)
+    return map_fractions(atoms, trajectory_file)
 end
 
 """
@@ -138,19 +213,8 @@ function mdlovofit(
     first=1, last=nothing, iref=1, nframes=100,
 )
     # Open trajectory and save it in temporary PDB file, for the selected atoms
-    tmp_trajectory_file, stride, last = Chemfiles.Trajectory(trajectory_file) do trajectory 
-        if isnothing(last)
-            last = length(trajectory)
-        else
-            if last > length(trajectory)
-                throw(ArgumentError("last > length(trajectory)"))
-            end
-        end
-        # Write temporary PDB file with the trajectory
-        stride = max(1,div(last-first+1,nframes))
-        tmp_trajectory_file = write_tmp_pdb_trajectory(atoms, trajectory; first=first, last=last, stride=stride)
-        return tmp_trajectory_file, stride, last
-    end
+    tmp_trajectory_file, last, stride = 
+        write_tmp_pdb_trajectory(atoms, trajectory_file; first=first, last=last, nframes=nframes)
     # Write atoms to consider file, by default all atoms are considered
     tmp_atoms_to_consider_file = tempname()
     for atom in atoms
