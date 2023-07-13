@@ -84,6 +84,7 @@ function show(io::IO, result::MDLovoFitResult)
     phigh = round(100*(1-result.fraction),digits=1)
     av_low = round((mean(result.rmsd_low)), digits=2)
     av_high = round((mean(result.rmsd_high)), digits=2)
+    av_all = round((mean(result.rmsd_all)), digits=2)
     print(io, chomp("""
     ---------------
     MDLovoFitResult
@@ -91,7 +92,7 @@ function show(io::IO, result::MDLovoFitResult)
 
     Aligned pdb file: $(result.aligned_pdb)
     Number of frames considered: $(length(result.iframe))
-    Average RMSD of all atoms: $(mean(result.rmsd_all))
+    Average RMSD of all atoms: $av_all
     Average RMSD of the $plow% atoms of lowest RMSD: $av_low
     Average RMSD of the $phigh% atoms of highest RMSD: $av_high
 
@@ -232,8 +233,8 @@ Run MDLovoFit on a trajectory.
 """
 function mdlovofit(
     atoms::AbstractVector{<:PDBTools.Atom}, 
-    trajectory_file::String, 
-    fraction::AbstractFloat; 
+    trajectory_file::String; 
+    fraction::AbstractFloat,
     output_pdb::Union{String,Nothing} = nothing,
     atoms_to_consider::AbstractVector{<:PDBTools.Atom} = atoms,
     first=1, last=nothing, iref=1, maxframes=100,
@@ -289,15 +290,13 @@ end
 function mdlovofit(
     selection::String,
     pdbfile::String, 
-    trajectory_file::String, 
-    fraction::AbstractFloat; 
+    trajectory_file::String; 
     kargs...
 )
     atoms = readPDB(pdbfile, selection)
     return mdlovofit(
         atoms, 
-        trajectory_file, 
-        fraction; 
+        trajectory_file; 
         kargs...
     )
 end
