@@ -13,7 +13,20 @@ export mdlovofit
 export MapFractions
 export map_fractions
 
-# Structure that contains the result of map_fractions
+"""
+    MapFractionsResult
+
+Structure that will contain the output of map_fractions.
+
+`fraction` contains the fraction of atoms considered in the alignment.
+
+`rmsd_low` contains the RMSD of the fraction of the structure with the lowest RMSD.
+
+`rmsd_high` contains the RMSD of the fraction not considered for the alignment.
+
+`rmsd_all` contains the RMSD of the whole structure.
+
+"""
 struct MapFractionsResult
     fraction::Vector{Float64}
     rmsd_low::Vector{Float64}
@@ -21,18 +34,21 @@ struct MapFractionsResult
     rmsd_all::Vector{Float64}
 end
 
-function show(io::IO, result::MDLovoFitResult)
+function show(io::IO, mf::MapFractionsResult)
     print(io, chomp("""
     ------------------
     MapFractionsResult
     ------------------
+    Greatest fraction for which the RMSD-low is smaller than 1: $(round(mf.fraction[findlast(<(1.0), mf.rmsd_low)],digits=2))
 
-    Fraction for which the RMSD-low is greater than 1: $(round(result.fraction[findfirst(>(1.0), result.rmsd_low)],digits=2))
-
-
+    fraction contains the fraction of atoms considered in the alignment.
+    rmsd_low contains the RMSD of the fraction of the structure with the lowest RMSD.
+    rmsd_high contains the RMSD of the fraction not considered for the alignment.
+    rmsd_all contains the RMSD of the whole structure.
     """))
     return nothing
 end
+
 # Structure that will contain the output of MDLovoFit
 """
     MDLovoFitResult
@@ -64,6 +80,10 @@ end
 
 import Base: show
 function show(io::IO, result::MDLovoFitResult)
+    plow = round(100*result.fraction,digits=1)
+    phigh = round(100*(1-result.fraction),digits=1)
+    av_low = round((mean(result.rmsd_low)), digits=2)
+    av_high = round((mean(result.rmsd_high)), digits=2)
     print(io, chomp("""
     ---------------
     MDLovoFitResult
@@ -72,11 +92,11 @@ function show(io::IO, result::MDLovoFitResult)
     Aligned pdb file: $(result.aligned_pdb)
     Number of frames considered: $(length(result.iframe))
     Average RMSD of all atoms: $(mean(result.rmsd_all))
-    Average RMSD of the $(round(100*result.fraction,digits=1))% atoms of lowest RMSD: $(mean(result.rmsd_low))
-    Average RMSD of the $(round(100*(1-result.fraction),digits=1))% atoms of highest RMSD: $(mean(result.rmsd_high))
+    Average RMSD of the $plow% atoms of lowest RMSD: $av_low
+    Average RMSD of the $phigh% atoms of highest RMSD: $av_high
 
     Frame indices availabe in result.iframe
-    RMSD data availabe in result.rmsd_low, result.rmsd_high and result.rmsd_all
+    RMSD data availabe in rmsd_low, rmsd_high, and rmsd_all
 
     RMSF data availabe in result.rmsf (Number of atoms: $(length(result.rmsf)))
     """))
@@ -85,6 +105,8 @@ end
 
 """
     write_frame!(trajectory_pdb_file, atoms, frame
+
+Write a frame of a trajectory in the temporary PDB trajectory file.
 
 """
 function write_frame!(
@@ -110,28 +132,32 @@ end
     write_tmp_pdb_trajectory(
         atoms::AbstractVector{<:PDBTools.Atom}, 
         trajectory_file::String; 
-        first=1, last=nothing, nframes=100,
+        first=1, last=nothing, maxframes=100,
     )
 
 Writes a temporary PDB file containing a trajectory. Returns the trajectory file name, the 
 last frame to be read, and the `stride` parameter.
 
+Returns the name of the file, the last frame to be read, and the stride parameter,
+computed from the `maxframes` input parameter. The `maxframes` parameter defines 
+the maximum number of frames (equally spaced) that will be used in the calculation.
+
 """
 function write_tmp_pdb_trajectory(
     atoms::AbstractVector{<:PDBTools.Atom}, 
     trajectory_file::String; 
-    first=1, last=nothing, nframes=100,
+    first=1, last=nothing, maxframes=100,
 )
     Chemfiles.Trajectory(trajectory_file) do trajectory 
         if isnothing(last)
-            last = length(trajectory)
+            last = Int(length(trajectory))
         else
             if last > length(trajectory)
                 throw(ArgumentError("last > length(trajectory)"))
             end
         end
         # Write temporary PDB file with the trajectory
-        stride = max(1,div(last-first+1,nframes))
+        stride = max(1,ceil(Int,(last-first+1)/maxframes))
         tmp_file = tempname()
         open(tmp_file, "w") do file_io
             for (iframe, frame) in enumerate(trajectory)
@@ -161,20 +187,20 @@ function map_fractions(
     trajectory_file::String;
     first=1,
     last=nothing,
-    nframes=100,
+    maxframes=100,
 )
     tmp_trajectory_file, last, _ = 
-        write_tmp_pdb_trajectory(atoms, trajectory_file; first=first, last=last, nframes=nframes)
+        write_tmp_pdb_trajectory(atoms, trajectory_file; first=first, last=last, maxframes=maxframes)
     mapfrac_file = tempname()
     MDLovoFit_jll.mdlovofit() do exe
         run(pipeline(`$exe -mapfrac $tmp_trajectory_file`; stdout=mapfrac_file))
     end
-    @show mapfrac_file
     data = readdlm(mapfrac_file, comments=true, comment_char='#')
-    fraction = data[:,1]
-    rmsd_low = data[:,2]
-    rmsd_high = data[:,3]
-    rmsd_all = data[:,4]
+    range = 1:findlast(<(1), data[:,1])
+    fraction = data[range,1]
+    rmsd_low = data[range,2]
+    rmsd_high = data[range,3]
+    rmsd_all = data[range,4]
     return MapFractionsResult(fraction, rmsd_low, rmsd_high, rmsd_all)
 end
 
@@ -198,7 +224,7 @@ end
         first=1, 
         last=nothing, # nothing means the last frame of the trajectory
         iref=1, # reference frame
-        nframes=100, # number of frames to be aligned
+        maxframes=100, # number of frames to be aligned
     )
 
 Run MDLovoFit on a trajectory.
@@ -210,11 +236,11 @@ function mdlovofit(
     fraction::AbstractFloat; 
     output_pdb::Union{String,Nothing} = nothing,
     atoms_to_consider::AbstractVector{<:PDBTools.Atom} = atoms,
-    first=1, last=nothing, iref=1, nframes=100,
+    first=1, last=nothing, iref=1, maxframes=100,
 )
     # Open trajectory and save it in temporary PDB file, for the selected atoms
     tmp_trajectory_file, last, stride = 
-        write_tmp_pdb_trajectory(atoms, trajectory_file; first=first, last=last, nframes=nframes)
+        write_tmp_pdb_trajectory(atoms, trajectory_file; first=first, last=last, maxframes=maxframes)
     # Write atoms to consider file, by default all atoms are considered
     tmp_atoms_to_consider_file = tempname()
     for atom in atoms
@@ -254,7 +280,7 @@ function mdlovofit(
     # Read RMSF file
     rmsf = readdlm(rmsf_file; comments=true, comment_char='#')[:,2]
     # Retun the data structure with the results
-    if !isnothing(output_pdb)
+    if isnothing(output_pdb)
         output_pdb = "Not saved."
     end
     return MDLovoFitResult(fraction, frame_index, rmsd_low, rmsd_high, rmsd_all, rmsf, output_pdb)
