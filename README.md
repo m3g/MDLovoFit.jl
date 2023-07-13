@@ -3,6 +3,12 @@
 Julia interface for the [MDLovoFit](http://m3g.iqm.unicamp.br) package for analyzing the mobility of 
 structures in MD simulations.  
 
+## Installation
+
+```julia
+julia> import Pkg; Pkg.add(url="https://github.com/m3g/MDLovoFit.jl")
+```
+
 ## Example
 
 ### Computing the fraction of atoms that can be aligned at each precision
@@ -92,6 +98,8 @@ atoms indicate if they are, or not, used in the alignment. Visualizing the frame
 which illustrates the low and high mobility regions of the protein.
 
 For additional information go to [MDLovoFit](http://m3g.iqm.unicamp.br/mdlovofit). 
+
+## Reference
 
 Please cite the following reference if MDLovoFit was useful:
 
