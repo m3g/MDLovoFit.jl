@@ -6,6 +6,7 @@ using DelimitedFiles
 using PDBTools
 import Chemfiles
 import MDLovoFit_jll
+import Base: show
 
 # Functions of the interface
 export MDLovoFitResult
@@ -34,7 +35,7 @@ struct MapFractionsResult
     rmsd_all::Vector{Float64}
 end
 
-function show(io::IO, mf::MapFractionsResult)
+function Base.show(io::IO, mf::MapFractionsResult)
     print(io, chomp("""
     ------------------
     MapFractionsResult
@@ -78,8 +79,7 @@ struct MDLovoFitResult
     aligned_pdb::String
 end
 
-import Base: show
-function show(io::IO, result::MDLovoFitResult)
+function Base.show(io::IO, result::MDLovoFitResult)
     plow = round(100*result.fraction,digits=1)
     phigh = round(100*(1-result.fraction),digits=1)
     av_low = round((mean(result.rmsd_low)), digits=2)

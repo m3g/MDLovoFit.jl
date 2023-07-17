@@ -6,7 +6,7 @@ structures in MD simulations.
 ## Installation
 
 ```julia
-julia> import Pkg; Pkg.add(url="https://github.com/m3g/MDLovoFit.jl")
+julia> import Pkg; Pkg.add("MDLovoFit")
 ```
 
 ## Example
