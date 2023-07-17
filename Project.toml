@@ -1,7 +1,7 @@
 name = "MDLovoFit"
 uuid = "55da9f78-c647-4a46-be5d-0de490449a34"
 authors = ["Leandro Martinez <lmartine@unicamp.br> and contributors"]
-version = "0.1.1"
+version = "0.1.2-DEV"
 
 [deps]
 Chemfiles = "46823bd8-5fb3-5f92-9aa0-96921f3dd015"
