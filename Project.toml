@@ -1,7 +1,7 @@
 name = "MDLovoFit"
 uuid = "55da9f78-c647-4a46-be5d-0de490449a34"
 authors = ["Leandro Martinez <lmartine@unicamp.br> and contributors"]
-version = "0.1.2-DEV"
+version = "0.1.2"
 
 [deps]
 Chemfiles = "46823bd8-5fb3-5f92-9aa0-96921f3dd015"
@@ -13,7 +13,7 @@ TestItems = "1c621080-faea-4a02-84b6-bbd5e436b8fe"
 
 [compat]
 Chemfiles = "0.10"
-DelimitedFiles = "1.9"
+DelimitedFiles = "1"
 MDLovoFit_jll = "20.1"
 PDBTools = "0.13.14"
 TestItems = "0.1.1"
