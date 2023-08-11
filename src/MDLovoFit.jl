@@ -1,5 +1,6 @@
 module MDLovoFit
 
+using Aqua
 using TestItems
 using Statistics: mean
 using DelimitedFiles
@@ -11,7 +12,7 @@ import Base: show
 # Functions of the interface
 export MDLovoFitResult
 export mdlovofit
-export MapFractions
+export MapFractionsResult
 export map_fractions
 
 """
