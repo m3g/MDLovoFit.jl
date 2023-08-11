@@ -5,15 +5,26 @@ structures in MD simulations.
 
 ## Installation
 
+1. Install Julia using the [juliaup](https://github.com/JuliaLang/juliaup#juliaup---julia-version-manager) installer, on your platform.
+
+2. Install the necessary packages with:
+
 ```julia
-julia> import Pkg; Pkg.add("MDLovoFit")
+juila> import Pkg; Pkg.activate("MDLovoFit", shared=true) 
+
+julia> Pkg.add(["MDLovoFit", "Plots"])
 ```
+
+These commands will create an environment with the `MDLovoFit` and `Plots` packages installed,
+within which the following example can be run.
 
 ## Example
 
 ### Computing the fraction of atoms that can be aligned at each precision
 
 ```julia
+julia> import Pkg; Pkg.activate("MDLovoFit", shared=true) # activate environment
+
 julia> using MDLovoFit, Plots
 
 # PDB file of the system
