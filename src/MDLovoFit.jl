@@ -4,7 +4,7 @@ using Aqua
 using TestItems
 using Statistics: mean
 using DelimitedFiles
-using PDBTools
+using PDBTools: write_pdb, write_pdb_atom
 import Chemfiles
 import MDLovoFit_jll
 import Base: show
@@ -123,10 +123,10 @@ function write_frame!(
            atoms[iatom].x = col[1]
            atoms[iatom].y = col[2]
            atoms[iatom].z = col[3]
-           println(trajectory_pdb_file, PDBTools.write_atom(atoms[iatom]))
+           println(trajectory_pdb_file, write_pdb_atom(atoms[iatom]))
         end
     end
-    println(trajectory_pdb_file, "ENDMDL")
+    println(trajectory_pdb_file, "END")
     return nothing
 end
 
@@ -212,7 +212,7 @@ function map_fractions(
     trajectory_file::String;
     kargs...
 )
-    atoms = readPDB(pdb_file, selection)
+    atoms = read_pdb(pdb_file, selection)
     return map_fractions(atoms, trajectory_file)
 end
 
@@ -253,21 +253,28 @@ function mdlovofit(
             atoms[i].beta = 0.0
         end
     end
-    writePDB(atoms, tmp_atoms_to_consider_file)
-    # Name of RMSF file
-    rmsf_file = tempname()
-    # Name of RMSD file
-    rmsd_file = tempname()
+    write_pdb(tmp_atoms_to_consider_file, atoms)
     # Run MDLovoFit
+    local rmsd_file, rmsf_file
     try
         if isnothing(output_pdb)
+            rmsf_file = tempname()
+            rmsd_file = tempname()
             MDLovoFit_jll.mdlovofit() do exe
                 run(pipeline(`$exe -f $fraction -iref $iref -rmsf $rmsf_file $tmp_trajectory_file`; stdout=rmsd_file))
             end
         else
+            # Name of RMSF file
+            rmsf_file = output_pdb[begin:end-4]*"_rmsf.dat"
+            rmsd_file = output_pdb[begin:end-4]*"_rmsd.dat"
             MDLovoFit_jll.mdlovofit() do exe
                 run(pipeline(`$exe -f $fraction -iref $iref -rmsf $rmsf_file -t $output_pdb $tmp_trajectory_file`; stdout=rmsd_file))
             end
+            println("------------------------------------")
+            println("Aligned structure file: $output_pdb")
+            println("RMSF data file: $rmsf_file")
+            println("RMSD data file: $rmsd_file")
+            println("------------------------------------")
         end
     catch 
         "ERROR in MDLovoFit execution"
