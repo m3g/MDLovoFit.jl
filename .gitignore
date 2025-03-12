@@ -1,3 +1,6 @@
 /Manifest.toml
 test/output/*
 teste.pdb
+aligned_rmsf.dat
+aligned_rmsd.dat
+aligned.pdb
