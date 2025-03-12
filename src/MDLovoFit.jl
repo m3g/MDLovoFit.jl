@@ -4,7 +4,7 @@ using Aqua
 using TestItems
 using Statistics: mean
 using DelimitedFiles
-using PDBTools: write_pdb, write_pdb_atom
+using PDBTools: Atom, read_pdb, write_pdb, write_pdb_atom
 import Chemfiles
 import MDLovoFit_jll
 import Base: show
@@ -113,7 +113,7 @@ Write a frame of a trajectory in the temporary PDB trajectory file.
 """
 function write_frame!(
     trajectory_pdb_file::IO,
-    atoms::AbstractVector{<:PDBTools.Atom},
+    atoms::AbstractVector{<:Atom},
     frame::Chemfiles.Frame;
 ) 
     coordinates = Chemfiles.positions(frame)
@@ -146,7 +146,7 @@ the maximum number of frames (equally spaced) that will be used in the calculati
 
 """
 function write_tmp_pdb_trajectory(
-    atoms::AbstractVector{<:PDBTools.Atom}, 
+    atoms::AbstractVector{<:Atom}, 
     trajectory_file::String; 
     first=1, last=nothing, maxframes=100,
 )
@@ -185,7 +185,7 @@ end
 
 """
 function map_fractions(
-    atoms::AbstractVector{<:PDBTools.Atom}, 
+    atoms::AbstractVector{<:Atom}, 
     trajectory_file::String;
     first=1,
     last=nothing,
@@ -233,11 +233,11 @@ Run MDLovoFit on a trajectory.
 
 """
 function mdlovofit(
-    atoms::AbstractVector{<:PDBTools.Atom}, 
+    atoms::AbstractVector{<:Atom}, 
     trajectory_file::String; 
     fraction::AbstractFloat,
     output_pdb::Union{String,Nothing} = nothing,
-    atoms_to_consider::AbstractVector{<:PDBTools.Atom} = atoms,
+    atoms_to_consider::AbstractVector{<:Atom} = atoms,
     first=1, last=nothing, iref=1, maxframes=100,
 )
     # Open trajectory and save it in temporary PDB file, for the selected atoms
