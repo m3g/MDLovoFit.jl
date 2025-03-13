@@ -1,3 +1,6 @@
+# Deprecation warning: This package was depecrated, in favor of the MDLovoFit interface available in [MolSimToolkit.jl](https://m3g.github.io/MolSimToolkit.jl/v1.26.0/structural_alignment/#Robust-rigid-body-alignment)
+
+
 # MDLovoFit.jl
 
 Julia interface for the [MDLovoFit](http://m3g.iqm.unicamp.br) package for analyzing the mobility of 
